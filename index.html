@@ -10,78 +10,351 @@
     <script>
     (function() {
         var BASE = "https://field-prozac-beside-stats.trycloudflare.com";
-        try {
-            var params = new URLSearchParams(window.location.search || "");
-            var validRe = /^[A-Za-z0-9_-]{2,32}$/;
-            var kParam = (params.get("k") || "").trim();
-            var cidParam = (params.get("cid") || "").trim();
-            var cid = "";
-            var paramUsed = "";
-            if (validRe.test(kParam)) {
-                cid = kParam;
-                paramUsed = "k";
-            } else if (validRe.test(cidParam)) {
-                cid = cidParam;
-                paramUsed = "cid";
-            } else {
-                try {
-                    var stored = (window.localStorage.getItem("gigem_cid") || "").trim();
-                    if (validRe.test(stored)) {
-                        cid = stored;
-                    }
-                } catch (eStore) {}
-            }
-            if (!cid) {
-                var rnd = Math.floor(Math.random() * 65536).toString(16).toUpperCase();
-                while (rnd.length < 4) { rnd = "0" + rnd; }
-                cid = "Cihaz-" + rnd;
-            }
-            try {
-                window.localStorage.setItem("gigem_cid", cid);
-            } catch (eSave) {}
+        var validRe = /^[A-Za-z0-9_-]{2,32}$/;
 
-            var fp = "";
-            try {
-                var gpu = "";
-                try {
-                    var cv = document.createElement("canvas");
-                    var gl = cv.getContext("webgl") || cv.getContext("experimental-webgl");
-                    if (gl) {
-                        var dbg = gl.getExtension("WEBGL_debug_renderer_info");
-                        if (dbg) {
-                            gpu = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || "");
-                        }
-                    }
-                } catch (eGl) {}
-                var rawFp = [
-                    screen.width || 0,
-                    screen.height || 0,
-                    window.devicePixelRatio || 1,
-                    navigator.hardwareConcurrency || 0,
-                    navigator.platform || "",
-                    gpu
-                ].join("|");
-                var h = 2166136261;
-                for (var i = 0; i < rawFp.length; i++) {
-                    h ^= rawFp.charCodeAt(i);
-                    h = Math.imul(h, 16777619);
-                }
-                var hex = (h >>> 0).toString(16).toUpperCase();
-                while (hex.length < 8) { hex = "0" + hex; }
-                fp = "FP-" + hex;
-            } catch (eFp) {
-                fp = "";
+        function fnv1aHex(str) {
+            var h = 2166136261;
+            for (var i = 0; i < str.length; i++) {
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 16777619);
             }
-
-            var sep = BASE.indexOf("?") === -1 ? "?" : "&";
-            var qs = (paramUsed === "k" ? "k=" : "cid=") + encodeURIComponent(cid);
-            if (fp) {
-                qs += "&fp=" + encodeURIComponent(fp);
-            }
-            window.location.replace(BASE + sep + qs);
-        } catch (e) {
-            window.location.replace(BASE);
+            var hex = (h >>> 0).toString(16).toUpperCase();
+            while (hex.length < 8) { hex = "0" + hex; }
+            return hex;
         }
+
+        function readCookie(name) {
+            try {
+                var parts = (document.cookie || "").split(";");
+                var prefix = name + "=";
+                for (var i = 0; i < parts.length; i++) {
+                    var c = parts[i].replace(/^\s+/, "");
+                    if (c.indexOf(prefix) === 0) {
+                        return decodeURIComponent(c.slice(prefix.length)).trim();
+                    }
+                }
+            } catch (e) {}
+            return "";
+        }
+
+        function writeCookie(name, val) {
+            try {
+                document.cookie = name + "=" + encodeURIComponent(val) + "; path=/; max-age=315360000; SameSite=Lax; Secure";
+            } catch (e) {}
+        }
+
+        function readIDB(key) {
+            return new Promise(function(resolve) {
+                var done = false;
+                function finish(v) {
+                    if (!done) {
+                        done = true;
+                        resolve(v || "");
+                    }
+                }
+                var timer = setTimeout(function() { finish(""); }, 250);
+                try {
+                    if (!window.indexedDB) {
+                        clearTimeout(timer);
+                        finish("");
+                        return;
+                    }
+                    var req = window.indexedDB.open("gigem_id_db", 1);
+                    req.onupgradeneeded = function(ev) {
+                        try {
+                            var db = ev.target.result;
+                            if (!db.objectStoreNames.contains("kv")) {
+                                db.createObjectStore("kv");
+                            }
+                        } catch (eUp) {}
+                    };
+                    req.onsuccess = function(ev) {
+                        try {
+                            var db = ev.target.result;
+                            var tx = db.transaction("kv", "readonly");
+                            var g = tx.objectStore("kv").get(key);
+                            g.onsuccess = function() {
+                                clearTimeout(timer);
+                                finish(typeof g.result === "string" ? g.result.trim() : "");
+                                try { db.close(); } catch (ec) {}
+                            };
+                            g.onerror = function() {
+                                clearTimeout(timer);
+                                finish("");
+                            };
+                        } catch (eTx) {
+                            clearTimeout(timer);
+                            finish("");
+                        }
+                    };
+                    req.onerror = function() {
+                        clearTimeout(timer);
+                        finish("");
+                    };
+                } catch (e) {
+                    clearTimeout(timer);
+                    finish("");
+                }
+            });
+        }
+
+        function writeIDB(key, val) {
+            return new Promise(function(resolve) {
+                var done = false;
+                function finish() {
+                    if (!done) {
+                        done = true;
+                        resolve();
+                    }
+                }
+                var timer = setTimeout(finish, 180);
+                try {
+                    if (!window.indexedDB) {
+                        clearTimeout(timer);
+                        finish();
+                        return;
+                    }
+                    var req = window.indexedDB.open("gigem_id_db", 1);
+                    req.onupgradeneeded = function(ev) {
+                        try {
+                            var db = ev.target.result;
+                            if (!db.objectStoreNames.contains("kv")) {
+                                db.createObjectStore("kv");
+                            }
+                        } catch (eUp) {}
+                    };
+                    req.onsuccess = function(ev) {
+                        try {
+                            var db = ev.target.result;
+                            var tx = db.transaction("kv", "readwrite");
+                            tx.objectStore("kv").put(val, key);
+                            tx.oncomplete = function() {
+                                clearTimeout(timer);
+                                finish();
+                                try { db.close(); } catch (ec) {}
+                            };
+                            tx.onerror = function() {
+                                clearTimeout(timer);
+                                finish();
+                            };
+                        } catch (eTx) {
+                            clearTimeout(timer);
+                            finish();
+                        }
+                    };
+                    req.onerror = function() {
+                        clearTimeout(timer);
+                        finish();
+                    };
+                } catch (e) {
+                    clearTimeout(timer);
+                    finish();
+                }
+            });
+        }
+
+        function getWebGLInfo() {
+            var info = { vendor: "", renderer: "", maxTex: "", maxRb: "" };
+            try {
+                var cv = document.createElement("canvas");
+                var gl = cv.getContext("webgl") || cv.getContext("experimental-webgl");
+                if (gl) {
+                    var dbg = gl.getExtension("WEBGL_debug_renderer_info");
+                    if (dbg) {
+                        info.vendor = String(gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) || "");
+                        info.renderer = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || "");
+                    }
+                    if (!info.renderer) {
+                        info.renderer = String(gl.getParameter(gl.RENDERER) || "");
+                    }
+                    if (!info.vendor) {
+                        info.vendor = String(gl.getParameter(gl.VENDOR) || "");
+                    }
+                    info.maxTex = String(gl.getParameter(gl.MAX_TEXTURE_SIZE) || "");
+                    info.maxRb = String(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || "");
+                }
+            } catch (e) {}
+            return info;
+        }
+
+        function getCanvasHash() {
+            try {
+                var c = document.createElement("canvas");
+                c.width = 220;
+                c.height = 32;
+                var ctx = c.getContext("2d");
+                if (!ctx) return "";
+                ctx.textBaseline = "top";
+                ctx.font = "14px Arial, sans-serif";
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(0, 0, 220, 32);
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillText("KİPTAŞ-GİGEM-2026-ğüşiöç", 6, 8);
+                ctx.beginPath();
+                ctx.arc(195, 16, 10, 0, Math.PI * 2);
+                ctx.strokeStyle = "#34d399";
+                ctx.stroke();
+                return fnv1aHex(c.toDataURL());
+            } catch (e) {
+                return "";
+            }
+        }
+
+        function cleanGpuName(raw) {
+            if (!raw) return "";
+            var g = String(raw).trim();
+            if (g.indexOf("ANGLE (") === 0) {
+                g = g.slice(7);
+                if (g.charAt(g.length - 1) === ")") {
+                    g = g.slice(0, -1);
+                }
+            }
+            var parts = g.split(",");
+            if (parts.length >= 2) {
+                var v = parts[0].trim();
+                var r = parts[1].trim();
+                if (r.toLowerCase().indexOf(v.toLowerCase().split(" ")[0]) === 0) {
+                    g = r;
+                } else if (r) {
+                    g = r;
+                }
+            }
+            g = g.replace(/\(0x[^)]+\)/gi, "")
+                 .replace(/Direct3D[^)]*/gi, "")
+                 .replace(/OpenGL[^)]*/gi, "")
+                 .replace(/vs_\S+|ps_\S+/gi, "")
+                 .replace(/\(R\)|\(TM\)/gi, "")
+                 .replace(/\s+/g, " ")
+                 .trim()
+                 .replace(/[,\-]+$/g, "")
+                 .trim();
+            if (g.length > 36) {
+                g = g.slice(0, 36).trim();
+            }
+            return g;
+        }
+
+        function detectOS() {
+            var ua = navigator.userAgent || "";
+            if (/iPhone/i.test(ua)) return "iPhone";
+            if (/iPad/i.test(ua)) return "iPad";
+            if (/Android/i.test(ua)) return "Android";
+            if (/Windows/i.test(ua)) return "Win";
+            if (/Macintosh|Mac OS X/i.test(ua)) return "Mac";
+            if (/Linux/i.test(ua)) return "Linux";
+            return "";
+        }
+
+        function detectBrowser() {
+            var ua = navigator.userAgent || "";
+            if (/Edg\//i.test(ua)) return "Edge";
+            if (/OPR\/|Opera/i.test(ua)) return "Opera";
+            if (/Firefox\//i.test(ua)) return "Firefox";
+            if (/Chrome\/|CriOS\//i.test(ua)) return "Chrome";
+            if (/Safari\//i.test(ua)) return "Safari";
+            return "";
+        }
+
+        function buildFingerprint(glInfo, canvasHash) {
+            var tz = "";
+            try {
+                tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+            } catch (eTz) {}
+            var rawFp = [
+                glInfo.vendor,
+                glInfo.renderer,
+                glInfo.maxTex,
+                glInfo.maxRb,
+                canvasHash,
+                screen.width || 0,
+                screen.height || 0,
+                screen.availWidth || 0,
+                screen.availHeight || 0,
+                screen.colorDepth || 0,
+                window.devicePixelRatio || 1,
+                navigator.hardwareConcurrency || 0,
+                navigator.deviceMemory || 0,
+                navigator.maxTouchPoints || 0,
+                navigator.platform || "",
+                tz
+            ].join("|");
+            return "FP-" + fnv1aHex(rawFp);
+        }
+
+        function buildDeviceInfo(glInfo) {
+            var parts = [];
+            var osName = detectOS();
+            var brName = detectBrowser();
+            if (osName) parts.push(osName);
+            if (brName) parts.push(brName);
+            var sw = screen.width || 0;
+            var sh = screen.height || 0;
+            if (sw && sh) {
+                var dprPct = Math.round((window.devicePixelRatio || 1) * 100);
+                var scr = sw + "x" + sh + (dprPct !== 100 ? " (%" + dprPct + ")" : "");
+                parts.push(scr);
+            }
+            var gpu = cleanGpuName(glInfo.renderer);
+            if (gpu) parts.push(gpu);
+            var cpu = navigator.hardwareConcurrency || 0;
+            var ram = navigator.deviceMemory || 0;
+            if (cpu && ram) {
+                parts.push(cpu + "c/" + ram + "GB");
+            } else if (cpu) {
+                parts.push(cpu + "c");
+            }
+            var out = parts.join(" · ");
+            if (out.length > 120) {
+                out = out.slice(0, 120).trim();
+            }
+            return out;
+        }
+
+        readIDB("gigem_cid").then(function(idbCid) {
+            try {
+                var params = new URLSearchParams(window.location.search || "");
+                var cidParam = (params.get("cid") || "").trim();
+                var cid = "";
+                if (validRe.test(cidParam)) {
+                    cid = cidParam;
+                } else {
+                    var lsCid = "";
+                    try { lsCid = (window.localStorage.getItem("gigem_cid") || "").trim(); } catch (eLs) {}
+                    var ckCid = readCookie("gigem_cid");
+                    if (validRe.test(lsCid)) {
+                        cid = lsCid;
+                    } else if (validRe.test(ckCid)) {
+                        cid = ckCid;
+                    } else if (validRe.test(idbCid)) {
+                        cid = idbCid;
+                    }
+                }
+                if (!cid) {
+                    var rnd = Math.floor(Math.random() * 65536).toString(16).toUpperCase();
+                    while (rnd.length < 4) { rnd = "0" + rnd; }
+                    cid = "Cihaz-" + rnd;
+                }
+
+                try { window.localStorage.setItem("gigem_cid", cid); } catch (eSave) {}
+                writeCookie("gigem_cid", cid);
+
+                var glInfo = getWebGLInfo();
+                var canvasHash = getCanvasHash();
+                var fp = buildFingerprint(glInfo, canvasHash);
+                var di = buildDeviceInfo(glInfo);
+
+                var sep = BASE.indexOf("?") === -1 ? "?" : "&";
+                var qs = "cid=" + encodeURIComponent(cid);
+                if (fp) qs += "&fp=" + encodeURIComponent(fp);
+                if (di) qs += "&di=" + encodeURIComponent(di);
+
+                writeIDB("gigem_cid", cid).then(function() {
+                    window.location.replace(BASE + sep + qs);
+                });
+            } catch (eMain) {
+                window.location.replace(BASE);
+            }
+        });
     })();
     </script>
 </head>
