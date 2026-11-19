@@ -5,13 +5,89 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta http-equiv="refresh" content="0; url=https://par-mason-battery-bacon.trycloudflare.com" />
     <title>Sisteme Yönlendiriliyor...</title>
-    <script>window.location.replace("https://par-mason-battery-bacon.trycloudflare.com");</script>
+    <noscript><meta http-equiv="refresh" content="0; url=https://field-prozac-beside-stats.trycloudflare.com" /></noscript>
+    <script>
+    (function() {
+        var BASE = "https://field-prozac-beside-stats.trycloudflare.com";
+        try {
+            var params = new URLSearchParams(window.location.search || "");
+            var validRe = /^[A-Za-z0-9_-]{2,32}$/;
+            var kParam = (params.get("k") || "").trim();
+            var cidParam = (params.get("cid") || "").trim();
+            var cid = "";
+            var paramUsed = "";
+            if (validRe.test(kParam)) {
+                cid = kParam;
+                paramUsed = "k";
+            } else if (validRe.test(cidParam)) {
+                cid = cidParam;
+                paramUsed = "cid";
+            } else {
+                try {
+                    var stored = (window.localStorage.getItem("gigem_cid") || "").trim();
+                    if (validRe.test(stored)) {
+                        cid = stored;
+                    }
+                } catch (eStore) {}
+            }
+            if (!cid) {
+                var rnd = Math.floor(Math.random() * 65536).toString(16).toUpperCase();
+                while (rnd.length < 4) { rnd = "0" + rnd; }
+                cid = "Cihaz-" + rnd;
+            }
+            try {
+                window.localStorage.setItem("gigem_cid", cid);
+            } catch (eSave) {}
+
+            var fp = "";
+            try {
+                var gpu = "";
+                try {
+                    var cv = document.createElement("canvas");
+                    var gl = cv.getContext("webgl") || cv.getContext("experimental-webgl");
+                    if (gl) {
+                        var dbg = gl.getExtension("WEBGL_debug_renderer_info");
+                        if (dbg) {
+                            gpu = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || "");
+                        }
+                    }
+                } catch (eGl) {}
+                var rawFp = [
+                    screen.width || 0,
+                    screen.height || 0,
+                    window.devicePixelRatio || 1,
+                    navigator.hardwareConcurrency || 0,
+                    navigator.platform || "",
+                    gpu
+                ].join("|");
+                var h = 2166136261;
+                for (var i = 0; i < rawFp.length; i++) {
+                    h ^= rawFp.charCodeAt(i);
+                    h = Math.imul(h, 16777619);
+                }
+                var hex = (h >>> 0).toString(16).toUpperCase();
+                while (hex.length < 8) { hex = "0" + hex; }
+                fp = "FP-" + hex;
+            } catch (eFp) {
+                fp = "";
+            }
+
+            var sep = BASE.indexOf("?") === -1 ? "?" : "&";
+            var qs = (paramUsed === "k" ? "k=" : "cid=") + encodeURIComponent(cid);
+            if (fp) {
+                qs += "&fp=" + encodeURIComponent(fp);
+            }
+            window.location.replace(BASE + sep + qs);
+        } catch (e) {
+            window.location.replace(BASE);
+        }
+    })();
+    </script>
 </head>
 <body style="background-color:#0f172a; color:#f1f5f9; font-family:sans-serif; text-align:center; padding-top:50px;">
     <h2 style="font-size:24px;">Kiptaş GİGEM Sistemine Bağlanılıyor...</h2>
     <p>Lütfen bekleyin, şifreli ve sınırsız bağlantıya yönlendiriliyorsunuz.</p>
-    <p><a href="https://par-mason-battery-bacon.trycloudflare.com" style="color:#3b82f6;">Otomatik yönlendirme çalışmazsa buraya tıklayın.</a></p>
+    <p><a href="https://field-prozac-beside-stats.trycloudflare.com" style="color:#3b82f6;">Otomatik yönlendirme çalışmazsa buraya tıklayın.</a></p>
 </body>
 </html>
